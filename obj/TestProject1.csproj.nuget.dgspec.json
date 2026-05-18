@@ -1,36 +1,36 @@
 {
   "format": 1,
   "restore": {
-    "D:\\đồ án\\Test unit\\TestProject1\\TestProject1.csproj": {}
+    "E:\\doantotnghiep\\Unit test\\Realtime-Auction-Test\\TestProject1.csproj": {}
   },
   "projects": {
-    "D:\\đồ án\\Test unit\\TestProject1\\TestProject1.csproj": {
+    "E:\\doantotnghiep\\Unit test\\Realtime-Auction-Test\\TestProject1.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\đồ án\\Test unit\\TestProject1\\TestProject1.csproj",
+        "projectUniqueName": "E:\\doantotnghiep\\Unit test\\Realtime-Auction-Test\\TestProject1.csproj",
         "projectName": "TestProject1",
-        "projectPath": "D:\\đồ án\\Test unit\\TestProject1\\TestProject1.csproj",
-        "packagesPath": "C:\\Users\\hii\\.nuget\\packages\\",
-        "outputPath": "D:\\đồ án\\Test unit\\TestProject1\\obj\\",
+        "projectPath": "E:\\doantotnghiep\\Unit test\\Realtime-Auction-Test\\TestProject1.csproj",
+        "packagesPath": "C:\\Users\\HP\\.nuget\\packages\\",
+        "outputPath": "E:\\doantotnghiep\\Unit test\\Realtime-Auction-Test\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\hii\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\HP\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
-          "net8.0"
+          "net9.0"
         ],
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
-          "net8.0": {
-            "targetAlias": "net8.0",
+          "net9.0": {
+            "targetAlias": "net9.0",
             "projectReferences": {}
           }
         },
@@ -47,8 +47,8 @@
         "SdkAnalysisLevel": "9.0.300"
       },
       "frameworks": {
-        "net8.0": {
-          "targetAlias": "net8.0",
+        "net9.0": {
+          "targetAlias": "net9.0",
           "dependencies": {
             "DotNetSeleniumExtras.WaitHelpers": {
               "target": "Package",
@@ -86,7 +86,7 @@
             },
             "Selenium.WebDriver.ChromeDriver": {
               "target": "Package",
-              "version": "[147.0.7727.5700, )"
+              "version": "[148.0.7778.16700, )"
             },
             "System.Text.Encoding.CodePages": {
               "target": "Package",
@@ -115,7 +115,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.312/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.313/PortableRuntimeIdentifierGraph.json"
         }
       }
     }
