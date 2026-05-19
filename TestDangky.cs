@@ -109,9 +109,7 @@ namespace ICareAutomation.Tests
             return text.ToLower();
         }
 
-        // ✅ FIX Nhóm 2 (L07/L14/L15/L19/L27/L37):
-        // - nativeInputValueSetter bypass maxlength HTML
-        // - Thêm keydown/keyup để Angular Zone.js nhận đủ change detection
+        // ✅ FIX Nhóm B: nativeInputValueSetter bypass maxlength + dispatch đủ events
         private void TypeText(IWebElement element, string text, string tag, string fieldName)
         {
             var js = (IJavaScriptExecutor)_driver;
@@ -134,8 +132,7 @@ namespace ICareAutomation.Tests
                 return;
             }
 
-            // Set giá trị mới — không bị chặn bởi maxlength HTML
-            // Dispatch đủ input/change/keydown/keyup để Angular FormControl cập nhật
+            // Set giá trị mới — bypass maxlength HTML, kích hoạt Angular FormControl
             js.ExecuteScript(@"
                 var s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                 s.call(arguments[0], arguments[1]);
@@ -149,23 +146,37 @@ namespace ICareAutomation.Tests
             Thread.Sleep(300);
         }
 
-        // ✅ FIX Nhóm 2: Click submit bằng JS để bypass Angular [disabled] binding
-        // Dùng cho các test cần trigger onRegister() dù nút có thể disabled
-        private void ClickSubmitByJs(string tag)
+        // ✅ FIX Nhóm 2 (L07/L14/L15/L19/L27/L37) — ROOT CAUSE FIX:
+        // JS button.click() không trigger Angular (ngSubmit) trên form
+        // → Phải dispatch 'submit' event thẳng lên <form> để Angular nhận
+        // → onRegister() chạy → validation length/regex → toast xuất hiện
+        private void DispatchFormSubmit(string tag)
         {
-            try
+            var js = (IJavaScriptExecutor)_driver;
+
+            // Thử dispatch submit lên form trước
+            var submitted = (bool)js.ExecuteScript(@"
+                var form = document.querySelector('form');
+                if (form) {
+                    var ev = new Event('submit', { bubbles: true, cancelable: true });
+                    form.dispatchEvent(ev);
+                    return true;
+                }
+                return false;
+            ");
+
+            if (submitted)
             {
-                var btn = _driver.FindElement(By.XPath(
-                    "//button[contains(.,'Đăng Ký') or contains(.,'Đăng ký') or @type='submit']"));
-                ((IJavaScriptExecutor)_driver).ExecuteScript(
-                    "arguments[0].scrollIntoView({block:'center'}); arguments[0].click();", btn);
-                Console.WriteLine($"{tag} [SubmitJS] Click submit qua JS thành công");
-                Thread.Sleep(1500);
+                Console.WriteLine($"{tag} [FormSubmit] Dispatch submit event lên <form> thành công");
             }
-            catch (Exception ex)
+            else
             {
-                Console.WriteLine($"{tag} [SubmitJS] Không tìm thấy nút submit: {ex.Message}");
+                // Fallback: không tìm thấy form → thử click nút bình thường
+                Console.WriteLine($"{tag} [FormSubmit] Không tìm thấy <form>, fallback click button");
+                ClickSubmitButton(tag);
             }
+
+            Thread.Sleep(1500);
         }
 
         // ✅ FIX L01/L08: Email unique theo timestamp tránh duplicate DB
@@ -247,7 +258,6 @@ namespace ICareAutomation.Tests
                     "document.querySelectorAll('input').forEach(el => " +
                     "  el.dispatchEvent(new Event('blur', { bubbles: true })));" +
                     "if (document.activeElement) document.activeElement.blur();");
-
                 Thread.Sleep(1000);
 
                 string actionUpper = (action ?? "").Trim().ToUpper();
@@ -256,29 +266,23 @@ namespace ICareAutomation.Tests
                 switch (actionUpper)
                 {
                     case "CHECK_INLINE_ERROR":
-                        // ✅ Nhóm A: form invalid → nút disabled
-                        // ✅ FIX Nhóm 3 (L20/L21/L22/L24): Angular validator email lỏng,
-                        //    không disable nút với email format sai → click submit JS rồi check toast
+                        // Nhóm A + Nhóm 3 (L20/L21/L22/L24):
+                        // Nếu nút disabled → PASS ngay
+                        // Nếu không disabled (Angular validator email lỏng) → submit và check toast
                         if (IsSubmitDisabled())
                         {
                             Console.WriteLine($"{tag} [CHECK_INLINE_ERROR] Nút disabled → PASS");
                         }
                         else
                         {
-                            Console.WriteLine($"{tag} [CHECK_INLINE_ERROR] Nút không disabled → thử submit để lấy toast");
-                            ClickSubmitByJs(tag);
+                            Console.WriteLine($"{tag} [CHECK_INLINE_ERROR] Nút không disabled → dispatch submit để check toast");
+                            DispatchFormSubmit(tag);
                             CheckCatchBackendAlert(tag);
-                            // Nếu có toast lỗi → cũng PASS (FE validate sau submit)
                             string toastText = TryGetAlertOrToast(wait, tag);
                             if (!string.IsNullOrEmpty(toastText))
-                            {
-                                Console.WriteLine($"{tag} [CHECK_INLINE_ERROR] Toast xuất hiện: '{toastText}' → PASS");
-                            }
+                                Console.WriteLine($"{tag} [CHECK_INLINE_ERROR] Toast: '{toastText}' → PASS");
                             else
-                            {
-                                // Không có toast, không disabled → thực sự là bug FE
-                                Assert.Warn($"{tag} FE không validate email format này (nút không disabled, không có toast). Đây là lỗi FE cần fix riêng.");
-                            }
+                                Assert.Warn($"{tag} FE không validate email format này — lỗi FE cần fix riêng.");
                         }
                         break;
 
@@ -297,9 +301,9 @@ namespace ICareAutomation.Tests
 
                     case "CHECK_TOAST_ERROR":
                     default:
-                        // ✅ FIX Nhóm 2 (L07/L14/L15/L19/L27/L37):
-                        // Click submit bằng JS để bypass disabled → onRegister() chạy → toast
-                        ClickSubmitByJs(tag);
+                        // ✅ FIX Nhóm 2: Dispatch submit event lên form thay vì click button
+                        // → Angular (ngSubmit) nhận event → onRegister() chạy → validation → toast
+                        DispatchFormSubmit(tag);
                         CheckCatchBackendAlert(tag);
                         ClickSubmitAndWaitToastError(wait, tag, cleanExpected);
                         break;
@@ -345,6 +349,7 @@ namespace ICareAutomation.Tests
         }
 
         // ─── SUBMIT ───────────────────────────────────────────────────────────────
+        // Click thông thường — dùng cho Register_Success và Check_Toggle
         private void ClickSubmitButton(string tag)
         {
             try
@@ -428,7 +433,6 @@ namespace ICareAutomation.Tests
         }
 
         // ─── TOGGLE ───────────────────────────────────────────────────────────────
-        // ✅ FIX L26/L36: Tìm icon toggle theo XPath thay vì offset cứng
         private void HandleToggle(string tag)
         {
             try
@@ -467,14 +471,13 @@ namespace ICareAutomation.Tests
                     Thread.Sleep(300);
                     toggleBtn.Click();
                     Thread.Sleep(500);
-                    Console.WriteLine($"{tag} [Toggle] Click thành công");
                 }
                 else
                 {
                     Console.WriteLine($"{tag} [Toggle] Dùng offset fallback");
                     var passElem = _driver.FindElement(By.XPath("//input[@type='password']"));
-                    int w = passElem.Size.Width;
-                    new Actions(_driver).MoveToElement(passElem, w / 2 - 25, 0).Click().Build().Perform();
+                    new Actions(_driver).MoveToElement(passElem, passElem.Size.Width / 2 - 25, 0)
+                        .Click().Build().Perform();
                     Thread.Sleep(500);
                 }
             }
