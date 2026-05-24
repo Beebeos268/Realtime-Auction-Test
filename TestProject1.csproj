@@ -34,11 +34,27 @@
   </ItemGroup>
 
 	<ItemGroup>
+		<None Update="ListViewTestData.xlsx">
+		  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
 		<None Update="LoginTestData.xlsx">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
 		<None Update="RegisterTestData.xlsx">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
+		<None Update="seller_token.txt">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Folder Include="Test file\" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Compile Update="TestDanhSachDauGia.cs">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </Compile>
 	</ItemGroup>
 </Project>
