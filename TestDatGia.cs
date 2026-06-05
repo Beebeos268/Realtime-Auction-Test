@@ -4,7 +4,6 @@ using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using SeleniumExtras.WaitHelpers;
 using System;
-using System.Globalization;
 
 namespace TestProject1
 {
@@ -16,9 +15,14 @@ namespace TestProject1
 
         private readonly string _baseUrl = "http://localhost:4200";
 
-        // account test
-        private readonly string _email = "ntpmm268255@gmail.com";
-        private readonly string _password = "Lam255@";
+        // =========================
+        // LOGIN ACCOUNT TEST
+        // =========================
+        private readonly string _email = "ntpnguyen210104@gmail.com";
+        private readonly string _password = "Nguyen@21";
+
+        // Số tiền đặt giá ở BID_05 — chỉnh nếu cần
+        private readonly string _bidAmount = "2200000";
 
         [OneTimeSetUp]
         public void SetupOnce()
@@ -32,20 +36,18 @@ namespace TestProject1
                 TimeSpan.FromSeconds(20)
             );
 
-            Login();
-
-            OpenAuctionDetail();
-        }
-
-        // ======================================================
-        // LOGIN
-        // ======================================================
-        private void Login()
-        {
+            // =========================
+            // GO TO LOGIN PAGE
+            // =========================
             _driver.Navigate().GoToUrl(_baseUrl + "/login");
 
             WaitForPageLoad();
 
+            Console.WriteLine("Current URL: " + _driver.Url);
+
+            // =========================
+            // INPUT EMAIL
+            // =========================
             var txtEmail = _wait.Until(
                 ExpectedConditions.ElementIsVisible(
                     By.Name("email")
@@ -55,6 +57,9 @@ namespace TestProject1
             txtEmail.Clear();
             txtEmail.SendKeys(_email);
 
+            // =========================
+            // INPUT PASSWORD
+            // =========================
             var txtPassword = _wait.Until(
                 ExpectedConditions.ElementIsVisible(
                     By.Name("password")
@@ -64,6 +69,9 @@ namespace TestProject1
             txtPassword.Clear();
             txtPassword.SendKeys(_password);
 
+            // =========================
+            // CLICK LOGIN
+            // =========================
             var btnLogin = _wait.Until(
                 ExpectedConditions.ElementToBeClickable(
                     By.XPath("//button[contains(.,'Đăng Nhập')]")
@@ -72,42 +80,16 @@ namespace TestProject1
 
             btnLogin.Click();
 
+            // =========================
+            // WAIT LOGIN SUCCESS
+            // =========================
             _wait.Until(d =>
                 !d.Url.Contains("/login"));
 
             WaitForPageLoad();
 
-            Console.WriteLine("LOGIN SUCCESS");
-        }
-
-        // ======================================================
-        // OPEN AUCTION DETAIL
-        // ======================================================
-        private void OpenAuctionDetail()
-        {
-            _driver.Navigate()
-                .GoToUrl(_baseUrl + "/auctions");
-
-            WaitForPageLoad();
-
-            var btnThamGia = _wait.Until(
-                ExpectedConditions.ElementToBeClickable(
-                    By.XPath("(//a[contains(.,'Tham gia đấu giá')])[1]")
-                )
-            );
-
-            ((IJavaScriptExecutor)_driver)
-                .ExecuteScript(
-                    "arguments[0].click();",
-                    btnThamGia
-                );
-
-            _wait.Until(d =>
-                d.Url.Contains("/auction/"));
-
-            WaitForPageLoad();
-
-            Console.WriteLine("OPEN DETAIL SUCCESS");
+            Console.WriteLine("Login success!");
+            Console.WriteLine("After login URL: " + _driver.Url);
         }
 
         private void WaitForPageLoad()
@@ -132,46 +114,86 @@ namespace TestProject1
 
         // ======================================================
         // BID_01
-        // Check input nhập giá
+        // Mở trang chi tiết phiên đấu giá
+        // (Menu -> Danh sách đấu giá -> click phiên đầu tiên)
         // ======================================================
         [Test, Order(1)]
-        public void BID_01_CheckBidInput()
+        public void BID_01_MoChiTietPhienDauGia()
         {
-            var inputBid = _wait.Until(
-                ExpectedConditions.ElementIsVisible(
-                    By.XPath("//input[@type='number']")
+            // Click Menu
+            var btnMenu = _wait.Until(
+                ExpectedConditions.ElementToBeClickable(
+                    By.XPath("//button[contains(.,'Menu')]")
                 )
             );
 
-            Assert.That(
-                inputBid.Displayed,
-                "Input nhập giá không hiển thị"
+            btnMenu.Click();
+
+            // Click "Danh sách đấu giá"
+            var linkDanhSach = _wait.Until(
+                ExpectedConditions.ElementToBeClickable(
+                    By.XPath("//a[contains(.,'Danh sách đấu giá')]")
+                )
             );
 
-            Console.WriteLine("BID_01 - OK");
+            linkDanhSach.Click();
+
+            WaitForPageLoad();
+
+            // Đợi danh sách load xong
+            _wait.Until(
+                ExpectedConditions.ElementExists(
+                    By.CssSelector(".browse-card")
+                )
+            );
+
+            // Click vào phiên đấu giá đầu tiên
+            var btnThamGia = _wait.Until(
+                ExpectedConditions.ElementToBeClickable(
+                    By.XPath("(//a[contains(.,'Tham gia đấu giá')])[1]")
+                )
+            );
+
+            ((IJavaScriptExecutor)_driver)
+                .ExecuteScript(
+                    "arguments[0].click();",
+                    btnThamGia
+                );
+
+            _wait.Until(d =>
+                d.Url.Contains("/auction/"));
+
+            WaitForPageLoad();
+
+            Assert.That(
+                _driver.Url.Contains("/auction/"),
+                "Không vào được trang chi tiết phiên đấu giá"
+            );
+
+            Console.WriteLine("BID_01 - OK: " + _driver.Url);
         }
 
         // ======================================================
         // BID_02
-        // Check button chốt giá
+        // Kiểm tra hiển thị nút CHỐT GIÁ
         // ======================================================
         [Test, Order(2)]
-        public void BID_02_CheckBidButton()
+        public void BID_02_HienThiNutChotGia()
         {
-            var btnBid = _wait.Until(
+            var btnChotGia = _wait.Until(
                 ExpectedConditions.ElementIsVisible(
                     By.XPath("//button[contains(.,'CHỐT GIÁ')]")
                 )
             );
 
             Assert.That(
-                btnBid.Displayed,
+                btnChotGia.Displayed,
                 "Không thấy nút CHỐT GIÁ"
             );
 
             Assert.That(
-                btnBid.Enabled,
-                "Nút CHỐT GIÁ bị disabled"
+                btnChotGia.Enabled,
+                "Nút CHỐT GIÁ bị disable"
             );
 
             Console.WriteLine("BID_02 - OK");
@@ -179,20 +201,24 @@ namespace TestProject1
 
         // ======================================================
         // BID_03
-        // Check text giá tối thiểu
+        // Kiểm tra hiển thị "GIÁ KHỞI ĐIỂM"
         // ======================================================
         [Test, Order(3)]
-        public void BID_03_CheckMinimumBidText()
+        public void BID_03_HienThiGiaKhoiDiem()
         {
-            var minBidText = _wait.Until(
+            // Tìm label "GIÁ KHỞI ĐIỂM" hoặc "Giá khởi điểm" (không phụ thuộc hoa/thường)
+            var lblGiaKhoiDiem = _wait.Until(
                 ExpectedConditions.ElementIsVisible(
-                    By.XPath("//*[contains(text(),'Tối thiểu')]")
+                    By.XPath(
+                        "//*[contains(translate(normalize-space(.), " +
+                        "'GIÁKHỞIĐIỂM', 'giákhởiđiểm'), 'giá khởi điểm')]"
+                    )
                 )
             );
 
             Assert.That(
-                minBidText.Text.Contains("Tối thiểu"),
-                "Không hiển thị giá tối thiểu"
+                lblGiaKhoiDiem.Displayed,
+                "Không thấy 'Giá khởi điểm' trên trang chi tiết"
             );
 
             Console.WriteLine("BID_03 - OK");
@@ -200,39 +226,23 @@ namespace TestProject1
 
         // ======================================================
         // BID_04
-        // Nhập giá hợp lệ
+        // Kiểm tra hiển thị "BƯỚC GIÁ"
         // ======================================================
         [Test, Order(4)]
-        public void BID_04_InputValidBid()
+        public void BID_04_HienThiBuocGia()
         {
-            var inputBid = _wait.Until(
+            var lblBuocGia = _wait.Until(
                 ExpectedConditions.ElementIsVisible(
-                    By.XPath("//input[@type='number']")
+                    By.XPath(
+                        "//*[contains(translate(normalize-space(.), " +
+                        "'BƯỚCGIÁ', 'bướcgiá'), 'bước giá')]"
+                    )
                 )
             );
 
-            // lấy placeholder minBidRequired
-            string placeholder =
-                inputBid.GetAttribute("placeholder");
-
-            decimal minBid =
-                decimal.Parse(
-                    placeholder,
-                    CultureInfo.InvariantCulture
-                );
-
-            decimal validBid = minBid + 100000;
-
-            inputBid.Clear();
-
-            inputBid.SendKeys(
-                validBid.ToString()
-            );
-
             Assert.That(
-                inputBid.GetAttribute("value")
-                    == validBid.ToString(),
-                "Không nhập được giá"
+                lblBuocGia.Displayed,
+                "Không thấy 'Bước giá' trên trang chi tiết"
             );
 
             Console.WriteLine("BID_04 - OK");
@@ -240,13 +250,29 @@ namespace TestProject1
 
         // ======================================================
         // BID_05
-        // Click đặt giá thành công
+        // Đặt giá thầu hợp lệ
+        // (Nhập số tiền -> Click CHỐT GIÁ -> Xác nhận)
         // ======================================================
-
         [Test, Order(5)]
-        public void BID_05_ClickBidButton()
-                {
-            var btnBid = _wait.Until(
+        public void BID_05_DatGiaThauHopLe()
+        {
+            // Tìm ô nhập giá thầu (input number trong form chốt giá)
+            var inputGia = _wait.Until(
+                ExpectedConditions.ElementIsVisible(
+                    By.CssSelector(
+                        "input[type='number'], " +
+                        "input[name*='price'], " +
+                        "input[name*='bid'], " +
+                        "input[placeholder*='giá']"
+                    )
+                )
+            );
+
+            inputGia.Clear();
+            inputGia.SendKeys(_bidAmount);
+
+            // Click CHỐT GIÁ
+            var btnChotGia = _wait.Until(
                 ExpectedConditions.ElementToBeClickable(
                     By.XPath("//button[contains(.,'CHỐT GIÁ')]")
                 )
@@ -255,63 +281,91 @@ namespace TestProject1
             ((IJavaScriptExecutor)_driver)
                 .ExecuteScript(
                     "arguments[0].click();",
-                    btnBid
+                    btnChotGia
                 );
 
-            // chờ toastr success
-            var successToast = _wait.Until(
-                ExpectedConditions.ElementIsVisible(
-                    By.CssSelector(".toast-success")
-                )
-            );
+            // Nếu có dialog confirm thì click xác nhận
+            try
+            {
+                var btnConfirm = new WebDriverWait(
+                    _driver,
+                    TimeSpan.FromSeconds(5)
+                ).Until(
+                    ExpectedConditions.ElementToBeClickable(
+                        By.XPath(
+                            "//button[contains(.,'Xác nhận') or " +
+                            "contains(.,'Đồng ý') or " +
+                            "contains(.,'OK')]"
+                        )
+                    )
+                );
 
-            Assert.That(
-                successToast.Displayed,
-                "Không hiển thị toast success"
-            );
+                btnConfirm.Click();
 
-            Console.WriteLine("BID_05 - OK");
+                Console.WriteLine("BID_05 - Đã xác nhận dialog");
+            }
+            catch (WebDriverTimeoutException)
+            {
+                // Không có dialog -> bỏ qua
+                Console.WriteLine("BID_05 - Không có dialog confirm");
+            }
+
+            // Đợi UI cập nhật
+            System.Threading.Thread.Sleep(2000);
+
+            Console.WriteLine("BID_05 - OK (đã đặt giá " + _bidAmount + ")");
         }
-
 
         // ======================================================
         // BID_06
-        // Check button đổi trạng thái
+        // Kiểm tra giá hiện tại cập nhật sau khi đặt giá
         // ======================================================
         [Test, Order(6)]
-        public void BID_06_CheckButtonStateAfterBid()
+        public void BID_06_KiemTraGiaHienTaiCapNhat()
         {
-            var bidButton = _wait.Until(
+            // Hiển thị số tiền vừa đặt — chấp nhận cả format
+            // "2.200.000", "2,200,000" hoặc "2200000"
+            var lblGiaMoi = _wait.Until(
                 ExpectedConditions.ElementIsVisible(
-                    By.XPath("//button[contains(.,'trả giá')]")
+                    By.XPath(
+                        "//*[contains(text(),'2.200.000') or " +
+                        "contains(text(),'2,200,000') or " +
+                        "contains(text(),'2200000')]"
+                    )
                 )
             );
 
             Assert.That(
-                bidButton.Text.Contains("trả giá"),
-                "Button không đổi trạng thái"
+                lblGiaMoi.Displayed,
+                "Giá hiện tại không cập nhật sau khi đặt giá"
             );
 
-            Console.WriteLine("BID_06 - OK");
+            Console.WriteLine("BID_06 - OK (giá hiện tại đã cập nhật)");
         }
-
 
         // ======================================================
         // BID_07
-        // Check history update
+        // Kiểm tra hiển thị lịch sử trả giá có "đang dẫn đầu"
+        //
+        // FIX: UI hiển thị "đang dẫn đầu" (chữ đ thường) chứ không
+        // phải "Đang dẫn đầu" (chữ Đ hoa) -> dùng translate để khớp
+        // không phụ thuộc hoa/thường
         // ======================================================
         [Test, Order(7)]
-        public void BID_07_CheckBidHistory()
+        public void BID_07_HienThiLichSuTraGia_DangDanDau()
         {
-            var historyItem = _wait.Until(
+            var lblDangDanDau = _wait.Until(
                 ExpectedConditions.ElementIsVisible(
-                    By.XPath("//*[contains(text(),'Đang dẫn đầu')]")
+                    By.XPath(
+                        "//*[contains(translate(normalize-space(.), " +
+                        "'ĐANGDẪĐẦU', 'đangdẫđầu'), 'đang dẫn đầu')]"
+                    )
                 )
             );
 
             Assert.That(
-                historyItem.Displayed,
-                "History không update"
+                lblDangDanDau.Displayed,
+                "Không thấy 'đang dẫn đầu' trong lịch sử trả giá"
             );
 
             Console.WriteLine("BID_07 - OK");

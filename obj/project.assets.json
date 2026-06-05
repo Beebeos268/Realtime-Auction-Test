@@ -708,7 +708,7 @@
           }
         }
       },
-      "Selenium.WebDriver.ChromeDriver/148.0.7778.16700": {
+      "Selenium.WebDriver.ChromeDriver/148.0.7778.17800": {
         "type": "package",
         "build": {
           "build/Selenium.WebDriver.ChromeDriver.targets": {}
@@ -1793,10 +1793,10 @@
         "selenium.webdriver.nuspec"
       ]
     },
-    "Selenium.WebDriver.ChromeDriver/148.0.7778.16700": {
-      "sha512": "A7Tf4tJMVAREFYYdO0s/ISs4+EgcJdQrNI5Ajnqf1FLSDXWt4YDxFb4MQUk+PWjI9b7RkrmnjHBlYU9VbQ8BGw==",
+    "Selenium.WebDriver.ChromeDriver/148.0.7778.17800": {
+      "sha512": "4rkWQVcXf/Jms6CCjdtR8bKrImkiMRsc+y3gkY5+l5F0FKsxG84ug4Awi/+5nAB803MsrQPYlHqw/zJLKEv6EA==",
       "type": "package",
-      "path": "selenium.webdriver.chromedriver/148.0.7778.16700",
+      "path": "selenium.webdriver.chromedriver/148.0.7778.17800",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
@@ -1813,7 +1813,7 @@
         "driver/win32/LICENSE.chromedriver",
         "driver/win32/chromedriver.exe",
         "nupkg-icon.png",
-        "selenium.webdriver.chromedriver.148.0.7778.16700.nupkg.sha512",
+        "selenium.webdriver.chromedriver.148.0.7778.17800.nupkg.sha512",
         "selenium.webdriver.chromedriver.nuspec"
       ]
     },
@@ -1957,29 +1957,29 @@
       "NUnit.Analyzers >= 4.12.0",
       "NUnit3TestAdapter >= 6.2.0",
       "Selenium.WebDriver >= 4.43.0",
-      "Selenium.WebDriver.ChromeDriver >= 148.0.7778.16700",
+      "Selenium.WebDriver.ChromeDriver >= 148.0.7778.17800",
       "System.Text.Encoding.CodePages >= 10.0.6",
       "coverlet.collector >= 10.0.0"
     ]
   },
   "packageFolders": {
-    "C:\\Users\\HP\\.nuget\\packages\\": {},
+    "C:\\Users\\hii\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "E:\\doantotnghiep\\Unit test\\Realtime-Auction-Test\\TestProject1.csproj",
+      "projectUniqueName": "D:\\đồ án\\Test unit\\TestProject1\\Realtime-Auction-test\\TestProject1.csproj",
       "projectName": "TestProject1",
-      "projectPath": "E:\\doantotnghiep\\Unit test\\Realtime-Auction-Test\\TestProject1.csproj",
-      "packagesPath": "C:\\Users\\HP\\.nuget\\packages\\",
-      "outputPath": "E:\\doantotnghiep\\Unit test\\Realtime-Auction-Test\\obj\\",
+      "projectPath": "D:\\đồ án\\Test unit\\TestProject1\\Realtime-Auction-test\\TestProject1.csproj",
+      "packagesPath": "C:\\Users\\hii\\.nuget\\packages\\",
+      "outputPath": "D:\\đồ án\\Test unit\\TestProject1\\Realtime-Auction-test\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
       ],
       "configFilePaths": [
-        "C:\\Users\\HP\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\hii\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
@@ -2048,7 +2048,7 @@
           },
           "Selenium.WebDriver.ChromeDriver": {
             "target": "Package",
-            "version": "[148.0.7778.16700, )"
+            "version": "[148.0.7778.17800, )"
           },
           "System.Text.Encoding.CodePages": {
             "target": "Package",
@@ -2077,7 +2077,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.313/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.312/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
