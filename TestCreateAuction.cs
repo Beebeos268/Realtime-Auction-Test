@@ -847,9 +847,7 @@ namespace TestProject1
             var expected = NormalizeText(row.ExpectedMessage);
             FillForm(row);
             Submit();
-            var toast = GetToastSuccess();
-            Assert.That(toast, Does.Contain(expected),
-                $"[A12] toast='{toast}' | expected contains='{expected}'");
+            AssertErrorMessage("A12", row.ExpectedMessage);
         }
 
         [Test, Order(13), Description("A13 – Bước giá để trống")]
@@ -898,9 +896,7 @@ namespace TestProject1
             var expected = NormalizeText(row.ExpectedMessage);
             FillForm(row);
             Submit();
-            var toast = GetToastSuccess();
-            Assert.That(toast, Does.Contain(expected),
-                $"[A17] toast='{toast}' | expected contains='{expected}'");
+            AssertErrorMessage("A12", row.ExpectedMessage);
         }
 
         [Test, Order(18), Description("A18 – Hẹn giờ - Để trống Ngày bắt đầu")]
@@ -973,9 +969,7 @@ namespace TestProject1
             var expected = NormalizeText(row.ExpectedMessage);
             FillForm(row);
             Submit();
-            var toast = GetToastSuccess();
-            Assert.That(toast, Does.Contain(expected),
-                $"[A21] toast='{toast}' | expected contains='{expected}'");
+            AssertErrorMessage("A12", row.ExpectedMessage);
         }
 
         [Test, Order(22), Description("A22 – Lên sàn ngay - Để trống Ngày kết thúc")]

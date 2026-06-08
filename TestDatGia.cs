@@ -18,8 +18,8 @@ namespace TestProject1
         // =========================
         // LOGIN ACCOUNT TEST
         // =========================
-        private readonly string _email = "ntpnguyen210104@gmail.com";
-        private readonly string _password = "Nguyen@21";
+        private readonly string _email = "ntpmm268255@gmail.com";
+        private readonly string _password = "Lam255@";
 
         // Số tiền đặt giá ở BID_05 — chỉnh nếu cần
         private readonly string _bidAmount = "2200000";
