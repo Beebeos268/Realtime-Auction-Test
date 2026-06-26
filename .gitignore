@@ -1,6 +1,6 @@
 .vs/
 bin/
 obj/
-
+TestProject1.csproj.Backup.tmp
 *.user
 *.suo

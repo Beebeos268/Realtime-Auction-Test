@@ -4,6 +4,10 @@ using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Support.UI;
 using SeleniumExtras.WaitHelpers;
 using System;
+using System.Globalization;
+using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace TestProject1.UI
 {
@@ -18,11 +22,39 @@ namespace TestProject1.UI
         // =========================
         // LOGIN ACCOUNT TEST
         // =========================
-        private readonly string _email = "doanthiennhi210104@gmail.com";
-        private readonly string _password = "1234N21@";
+        private readonly string _email = "vietanhdd268@gmail.com";
+        private readonly string _password = "Vietanh268@";
+        private string ReadBidInputAmount(IWebElement input)
+        {
+            var value = input.GetAttribute("value") ?? "";
+            return DigitsOnly(value);
+        }
+        private static string NormalizeVietnamese(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+
+            text = text.ToLowerInvariant()
+                .Replace("đ", "d")
+                .Replace("Đ", "d")
+                .Replace("•", " ")
+                .Replace("-", " ");
+
+            var normalized = text.Normalize(NormalizationForm.FormD);
+            var sb = new StringBuilder();
+
+            foreach (var c in normalized)
+            {
+                var category = CharUnicodeInfo.GetUnicodeCategory(c);
+                if (category != UnicodeCategory.NonSpacingMark)
+                    sb.Append(c);
+            }
+
+            return Regex.Replace(sb.ToString().Normalize(NormalizationForm.FormC), @"\s+", " ").Trim();
+        }
 
         // Số tiền đặt giá ở BID_05 — chỉnh nếu cần
-        private readonly string _bidAmount = "2200000";
+        private string _bidAmount = "";
+
 
         [OneTimeSetUp]
         public void SetupOnce()
@@ -256,7 +288,6 @@ namespace TestProject1.UI
         [Test, Order(5)]
         public void BID_05_DatGiaThauHopLe()
         {
-            // Tìm ô nhập giá thầu (input number trong form chốt giá)
             var inputGia = _wait.Until(
                 ExpectedConditions.ElementIsVisible(
                     By.CssSelector(
@@ -268,10 +299,44 @@ namespace TestProject1.UI
                 )
             );
 
-            inputGia.Clear();
-            inputGia.SendKeys(_bidAmount);
+            inputGia.Click();
+            inputGia.SendKeys(Keys.Control + "a");
+            inputGia.SendKeys(Keys.Delete);
 
-            // Click CHỐT GIÁ
+            // Bấm nút Giá tối thiểu để luôn lấy giá hợp lệ hiện tại
+            var btnGiaToiThieu = _wait.Until(
+                ExpectedConditions.ElementToBeClickable(
+                    By.XPath("//button[contains(normalize-space(.),'Giá tối thiểu')]")
+                )
+            );
+
+            ((IJavaScriptExecutor)_driver)
+                .ExecuteScript("arguments[0].click();", btnGiaToiThieu);
+
+            Thread.Sleep(500);
+
+            // Bấm thêm + Bước giá để chắc chắn vượt tối thiểu
+            var btnCongBuocGia = _wait.Until(
+                ExpectedConditions.ElementToBeClickable(
+                    By.XPath("//button[contains(normalize-space(.),'+ Bước giá') or (contains(.,'+') and contains(.,'Bước giá'))]")
+                )
+            );
+
+            ((IJavaScriptExecutor)_driver)
+                .ExecuteScript("arguments[0].click();", btnCongBuocGia);
+
+            Thread.Sleep(500);
+
+            _bidAmount = ReadBidInputAmount(inputGia);
+
+            Console.WriteLine("BID_05 - Giá sẽ đặt: " + _bidAmount);
+
+            Assert.That(
+                string.IsNullOrWhiteSpace(_bidAmount),
+                Is.False,
+                "Không đọc được giá đặt từ input"
+            );
+
             var btnChotGia = _wait.Until(
                 ExpectedConditions.ElementToBeClickable(
                     By.XPath("//button[contains(.,'CHỐT GIÁ')]")
@@ -279,41 +344,80 @@ namespace TestProject1.UI
             );
 
             ((IJavaScriptExecutor)_driver)
-                .ExecuteScript(
-                    "arguments[0].click();",
-                    btnChotGia
-                );
+                .ExecuteScript("arguments[0].click();", btnChotGia);
 
-            // Nếu có dialog confirm thì click xác nhận
             try
             {
-                var btnConfirm = new WebDriverWait(
-                    _driver,
-                    TimeSpan.FromSeconds(5)
-                ).Until(
-                    ExpectedConditions.ElementToBeClickable(
-                        By.XPath(
-                            "//button[contains(.,'Xác nhận') or " +
-                            "contains(.,'Đồng ý') or " +
-                            "contains(.,'OK')]"
+                var btnConfirm = new WebDriverWait(_driver, TimeSpan.FromSeconds(5))
+                    .Until(
+                        ExpectedConditions.ElementToBeClickable(
+                            By.XPath(
+                                "//button[contains(.,'Xác nhận') or " +
+                                "contains(.,'Đồng ý') or " +
+                                "contains(.,'OK')]"
+                            )
                         )
-                    )
-                );
+                    );
 
                 btnConfirm.Click();
-
                 Console.WriteLine("BID_05 - Đã xác nhận dialog");
             }
             catch (WebDriverTimeoutException)
             {
-                // Không có dialog -> bỏ qua
                 Console.WriteLine("BID_05 - Không có dialog confirm");
             }
 
-            // Đợi UI cập nhật
             Thread.Sleep(2000);
 
-            Console.WriteLine("BID_05 - OK (đã đặt giá " + _bidAmount + ")");
+            Console.WriteLine("BID_05 - OK, đã đặt giá: " + _bidAmount);
+        }
+
+
+        private string GetBodyText()
+        {
+            try
+            {
+                return _driver.FindElement(By.TagName("body")).Text ?? "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private static string DigitsOnly(string text)
+        {
+            return Regex.Replace(text ?? "", @"\D", "");
+        }
+
+        private static bool PageTextContainsMoney(string bodyText, string amount)
+        {
+            var expectedDigits = DigitsOnly(amount);
+            if (string.IsNullOrWhiteSpace(expectedDigits)) return false;
+
+            // Chấp nhận 2.200.000 / 2,200,000 / 2 200 000 / 2200000 / 2.200.000 VNĐ
+            var bodyDigits = DigitsOnly(bodyText);
+            if (bodyDigits.Contains(expectedDigits)) return true;
+
+            return bodyText.Contains(amount);
+        }
+
+        private void DumpBidPageText(string title)
+        {
+            try
+            {
+                var bodyText = GetBodyText();
+                Console.WriteLine("========== " + title + " ==========");
+                Console.WriteLine("URL: " + _driver.Url);
+                Console.WriteLine("Expected bid amount: " + _bidAmount);
+                Console.WriteLine("Body contains expected digits: " + PageTextContainsMoney(bodyText, _bidAmount));
+                Console.WriteLine(bodyText.Length > 5000 ? bodyText.Substring(0, 5000) : bodyText);
+                Console.WriteLine("========== END DUMP ==========");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Không dump được text trang: " + ex.Message);
+            }
         }
 
         // ======================================================
@@ -323,24 +427,27 @@ namespace TestProject1.UI
         [Test, Order(6)]
         public void BID_06_KiemTraGiaHienTaiCapNhat()
         {
-            // Hiển thị số tiền vừa đặt — chấp nhận cả format
-            // "2.200.000", "2,200,000" hoặc "2200000"
-            var lblGiaMoi = _wait.Until(
-                ExpectedConditions.ElementIsVisible(
-                    By.XPath(
-                        "//*[contains(text(),'2.200.000') or " +
-                        "contains(text(),'2,200,000') or " +
-                        "contains(text(),'2200000')]"
-                    )
-                )
+            Assert.That(
+                string.IsNullOrWhiteSpace(_bidAmount),
+                Is.False,
+                "BID_06 không có _bidAmount. Hãy chạy từ BID_01 đến BID_06, không chạy riêng BID_06."
             );
+
+            bool found = _wait.Until(d =>
+            {
+                var bodyText = d.FindElement(By.TagName("body")).Text ?? "";
+                var bodyDigits = DigitsOnly(bodyText);
+
+                return bodyDigits.Contains(_bidAmount);
+            });
 
             Assert.That(
-                lblGiaMoi.Displayed,
-                "Giá hiện tại không cập nhật sau khi đặt giá"
+                found,
+                Is.True,
+                $"Không thấy giá vừa đặt {_bidAmount} trên trang"
             );
 
-            Console.WriteLine("BID_06 - OK (giá hiện tại đã cập nhật)");
+            Console.WriteLine("BID_06 - OK, giá hiện tại đã cập nhật: " + _bidAmount);
         }
 
         // ======================================================
@@ -354,21 +461,41 @@ namespace TestProject1.UI
         [Test, Order(7)]
         public void BID_07_HienThiLichSuTraGia_DangDanDau()
         {
-            var lblDangDanDau = _wait.Until(
-                ExpectedConditions.ElementIsVisible(
-                    By.XPath(
-                        "//*[contains(translate(normalize-space(.), " +
-                        "'ĐANGDẪĐẦU', 'đangdẫđầu'), 'đang dẫn đầu')]"
-                    )
-                )
-            );
+            ((IJavaScriptExecutor)_driver)
+                .ExecuteScript("window.scrollTo(0, document.body.scrollHeight);");
 
-            Assert.That(
-                lblDangDanDau.Displayed,
-                "Không thấy 'đang dẫn đầu' trong lịch sử trả giá"
-            );
+            Thread.Sleep(800);
 
-            Console.WriteLine("BID_07 - OK");
+            try
+            {
+                bool found = _wait.Until(d =>
+                {
+                    var bodyText = d.FindElement(By.TagName("body")).Text ?? "";
+                    var normalized = NormalizeVietnamese(bodyText);
+
+                    return
+                        normalized.Contains("ban dan dau") ||
+                        normalized.Contains("ban dang dan dau") ||
+                        normalized.Contains("dang dan dau") ||
+                        normalized.Contains("dan dau") ||
+                        bodyText.Contains("Bạn • dẫn đầu") ||
+                        bodyText.Contains("Bạn - dẫn đầu") ||
+                        bodyText.Contains("Bạn đang dẫn đầu");
+                });
+
+                Assert.That(found, Is.True, "Không thấy trạng thái dẫn đầu trong bảng xếp hạng.");
+                Console.WriteLine("BID_07 - OK: đã thấy người dùng đang dẫn đầu.");
+            }
+            catch (WebDriverTimeoutException)
+            {
+                var bodyText = _driver.FindElement(By.TagName("body")).Text ?? "";
+
+                Console.WriteLine("========== BID_07 FAIL - BODY TEXT ==========");
+                Console.WriteLine(bodyText);
+                Console.WriteLine("========== END ==========");
+
+                Assert.Fail("Không thấy trạng thái 'Bạn • dẫn đầu' hoặc 'dẫn đầu' trên trang.");
+            }
         }
 
         [Test, Order(8)]

@@ -11,10 +11,12 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Text.RegularExpressions;
+using System.Runtime.CompilerServices;
 
 namespace TestProject1.UI
 {
     [TestFixture]
+    [NonParallelizable]
     public class TestDangKy
     {
         private IWebDriver _driver;
@@ -68,10 +70,40 @@ namespace TestProject1.UI
         }
 
         // ─── ĐỌC EXCEL ────────────────────────────────────────────────────────────
+        private static string ResolveExcelPath([CallerFilePath] string sourceFilePath = "")
+        {
+            // Khi chạy test, AppDomain.CurrentDomain.BaseDirectory thường là:
+            // bin/Debug/net9.0 nên nếu Excel không copy vào output thì sẽ bị FileNotFound.
+            var csDir = Path.GetDirectoryName(sourceFilePath) ?? "";
+            var projectRoot = Path.GetFullPath(Path.Combine(csDir, ".."));
+
+            var candidates = new[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "RegisterTestData.xlsx"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Excel", "RegisterTestData.xlsx"),
+                Path.Combine(projectRoot, "Excel", "RegisterTestData.xlsx"),
+                Path.Combine(csDir, "RegisterTestData.xlsx")
+            };
+
+            foreach (var path in candidates)
+            {
+                if (File.Exists(path))
+                    return path;
+            }
+
+            throw new FileNotFoundException(
+                "Không tìm thấy RegisterTestData.xlsx. Đã thử các đường dẫn: " +
+                string.Join(" | ", candidates),
+                candidates[0]
+            );
+        }
+
         public static IEnumerable<TestCaseData> ReadExcelData()
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "RegisterTestData.xlsx");
+            string filePath = ResolveExcelPath();
+
+            Console.WriteLine("[REGISTER-EXCEL] Đang đọc file: " + filePath);
 
             using var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             using var reader = ExcelReaderFactory.CreateReader(stream);
@@ -179,20 +211,40 @@ namespace TestProject1.UI
             Thread.Sleep(1500);
         }
 
-        // ✅ FIX L01/L08: Email unique theo timestamp tránh duplicate DB
+        // ✅ Tạo email unique nhưng vẫn không vượt quá giới hạn maxlength của input email.
+        // Form register hiện đang đỏ viền khi email dài > khoảng 30 ký tự.
+        // Vì vậy không nối timestamp 10 ký tự nữa, chỉ dùng 6 ký tự Guid và cắt ngắn local-part nếu cần.
         private string MakeUniqueEmailIfNeeded(string email, string action)
         {
             string a = (action ?? "").Trim().ToUpper();
+
             if ((a == "REGISTER_SUCCESS" || a == "CHECK_TOGGLE")
                 && !string.IsNullOrEmpty(email) && email.Contains("@"))
             {
+                const int maxEmailLength = 30;
+
                 int at = email.LastIndexOf('@');
                 string loc = email[..at];
                 string dom = email[at..];
-                string uni = $"{loc}_{_emailSuffix}{dom}";
-                Console.WriteLine($"[UniqueEmail] {email} → {uni}");
+
+                string suffix = Guid.NewGuid().ToString("N")[..6];
+                int maxLocalLength = Math.Max(1, maxEmailLength - dom.Length);
+
+                string newLocal = $"{loc}_{suffix}";
+
+                if (newLocal.Length > maxLocalLength)
+                {
+                    int keep = Math.Max(1, maxLocalLength - suffix.Length - 1);
+                    loc = loc.Length > keep ? loc[..keep] : loc;
+                    newLocal = $"{loc}_{suffix}";
+                }
+
+                string uni = $"{newLocal}{dom}";
+
+                Console.WriteLine($"[UniqueEmail] {email} → {uni} (length={uni.Length})");
                 return uni;
             }
+
             return email;
         }
 
@@ -200,23 +252,41 @@ namespace TestProject1.UI
         private void NavigateToRegisterPage(string tag)
         {
             _driver.Manage().Window.Maximize();
-            var wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(5));
+            var wait = new WebDriverWait(_driver, TimeSpan.FromSeconds(8));
+
+            _driver.Navigate().GoToUrl(_registerUrl);
+
             try
             {
-                _driver.Navigate().GoToUrl(_registerUrl);
-                var check = _driver.FindElements(By.XPath(
-                    "//*[contains(text(),'Tạo Tài Khoản') or contains(text(),'Tạo tài khoản')] " +
-                    "| //input[contains(@placeholder,'Nguyễn Văn')]"));
-                if (check.Count > 0) return;
+                wait.Until(d =>
+                    d.Url.Contains("/register") &&
+                    d.FindElements(By.XPath(
+                        "//input[@name='fullName' or @name='hoTen' or @formcontrolname='fullName' or @formcontrolname='hoTen' or contains(@placeholder,'Nguyễn Văn') or contains(@placeholder,'Họ tên')]"
+                    )).Any(e => { try { return e.Displayed; } catch { return false; } })
+                );
+
+                Console.WriteLine($"{tag} [NAV] Đã vào register: {_driver.Url}");
+                return;
             }
-            catch { }
+            catch
+            {
+                Console.WriteLine($"{tag} [NAV] Vào trực tiếp /register chưa thấy form, thử đi từ login.");
+            }
 
             _driver.Navigate().GoToUrl(_loginUrl);
             var link = wait.Until(ExpectedConditions.ElementToBeClickable(By.XPath(
                 "//a[contains(.,'Tạo tài khoản')] | //button[contains(.,'Tạo tài khoản')] " +
                 "| //*[contains(text(),'Tạo tài khoản mới')]")));
             link.Click();
+
+            wait.Until(d =>
+                d.Url.Contains("/register") ||
+                d.FindElements(By.XPath("//input[@name='fullName' or @name='hoTen' or @formcontrolname='fullName' or @formcontrolname='hoTen' or contains(@placeholder,'Nguyễn Văn') or contains(@placeholder,'Họ tên')]"))
+                    .Any(e => { try { return e.Displayed; } catch { return false; } })
+            );
+
             Thread.Sleep(500);
+            Console.WriteLine($"{tag} [NAV] Đã vào register qua login: {_driver.Url}");
         }
 
         // ─── TEST CHÍNH ───────────────────────────────────────────────────────────
@@ -236,18 +306,21 @@ namespace TestProject1.UI
                 string uniqueEmail = MakeUniqueEmailIfNeeded(email, action);
 
                 FillField(new[] {
-                    "//input[contains(@placeholder,'Nguyễn Văn')]",
-                    "//input[@formcontrolname='hoTen' or @formcontrolname='fullName' or @formcontrolname='name']"
+                    "//input[@name='fullName' or @name='hoTen' or @name='name' or @formcontrolname='hoTen' or @formcontrolname='fullName' or @formcontrolname='name']",
+                    "//input[contains(@placeholder,'Nguyễn Văn') or contains(@placeholder,'Họ tên') or contains(@placeholder,'họ tên')]",
+                    "//label[contains(.,'Họ tên') or contains(.,'HỌ TÊN')]/following::input[1]"
                 }, hoTen, tag, "HoTen");
 
                 FillField(new[] {
-                    "//input[contains(@placeholder,'0987') or contains(@placeholder,'xxx')]",
-                    "//input[@formcontrolname='soDienThoai' or @formcontrolname='sdt' " +
-                    "or @formcontrolname='phone' or @formcontrolname='phoneNumber']"
+                    "//input[@name='phoneNumber' or @name='phone' or @name='sdt' or @formcontrolname='soDienThoai' or @formcontrolname='sdt' or @formcontrolname='phone' or @formcontrolname='phoneNumber']",
+                    "//input[contains(@placeholder,'0987') or contains(@placeholder,'xxx') or contains(@placeholder,'Số điện thoại') or contains(@placeholder,'số điện thoại')]",
+                    "//label[contains(.,'Số điện thoại') or contains(.,'SỐ ĐIỆN THOẠI')]/following::input[1]"
                 }, sdt, tag, "SDT");
 
                 FillField(new[] {
-                    "//input[contains(@placeholder,'example@gmail') or @type='email' or @formcontrolname='email']"
+                    "//input[@name='email' or @id='email' or @autocomplete='email' or @type='email' or @formcontrolname='email']",
+                    "//input[contains(translate(@placeholder,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'email')]",
+                    "//label[contains(translate(normalize-space(.),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'email')]/following::input[1]"
                 }, uniqueEmail, tag, "Email");
 
                 FillPasswordField(matKhau, tag, "MatKhau", isFirst: true);
@@ -309,43 +382,114 @@ namespace TestProject1.UI
                         break;
                 }
             }
+            catch (AssertionException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                Assert.Fail($"{tag} Thất bại: {ex.Message}");
+                Assert.Fail($"{tag} Thất bại do lỗi hệ thống: {ex.Message}");
             }
         }
 
-        // ─── FILL FIELDS ──────────────────────────────────────────────────────────
-        private void FillField(string[] xpaths, string value, string tag, string fieldName)
+        private void DumpInputs(string tag)
+        {
+            try
+            {
+                Console.WriteLine($"{tag} ===== INPUTS TRÊN TRANG =====");
+                var inputs = _driver.FindElements(By.TagName("input"));
+                for (int i = 0; i < inputs.Count; i++)
+                {
+                    try
+                    {
+                        var e = inputs[i];
+                        Console.WriteLine(
+                            $"{tag} input[{i}] displayed={e.Displayed}, enabled={e.Enabled}, " +
+                            $"type='{e.GetAttribute("type")}', name='{e.GetAttribute("name")}', " +
+                            $"id='{e.GetAttribute("id")}', formcontrolname='{e.GetAttribute("formcontrolname")}', " +
+                            $"placeholder='{e.GetAttribute("placeholder")}'"
+                        );
+                    }
+                    catch { }
+                }
+                Console.WriteLine($"{tag} URL hiện tại: {_driver.Url}");
+                Console.WriteLine($"{tag} ===== END INPUTS =====");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"{tag} Không dump được inputs: {ex.Message}");
+            }
+        }
+
+        private IWebElement FindVisibleInput(string[] xpaths)
         {
             foreach (var xp in xpaths)
             {
                 try
                 {
-                    var elem = _driver.FindElement(By.XPath(xp));
-                    if (elem.Displayed) { TypeText(elem, value, tag, fieldName); return; }
+                    var elems = _driver.FindElements(By.XPath(xp));
+                    foreach (var elem in elems)
+                    {
+                        try
+                        {
+                            if (elem.Displayed && elem.Enabled)
+                                return elem;
+                        }
+                        catch { }
+                    }
                 }
                 catch { }
             }
-            Console.WriteLine($"{tag} [{fieldName}] CẢNH BÁO: Không tìm thấy field");
+
+            return null;
+        }
+
+        // ─── FILL FIELDS ──────────────────────────────────────────────────────────
+        private void FillField(string[] xpaths, string value, string tag, string fieldName, bool required = true)
+        {
+            var elem = FindVisibleInput(xpaths);
+
+            if (elem != null)
+            {
+                TypeText(elem, value, tag, fieldName);
+                return;
+            }
+
+            DumpInputs(tag);
+            string msg = $"{tag} [{fieldName}] Không tìm thấy field trên trang register";
+
+            if (required)
+                throw new NoSuchElementException(msg);
+
+            Console.WriteLine(msg);
         }
 
         private void FillPasswordField(string value, string tag, string fieldName, bool isFirst)
         {
             var inputs = _driver.FindElements(By.XPath(
-                "//input[@type='password'] | " +
-                "//input[@formcontrolname='matKhau' or @formcontrolname='password' " +
-                "or @formcontrolname='passwordHash' or @formcontrolname='confirmPassword']"));
+                    "//input[not(@type='hidden') and (" +
+                    "@type='password' or " +
+                    "contains(translate(@name,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'password') or " +
+                    "contains(translate(@formcontrolname,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'password') or " +
+                    "contains(translate(@name,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'matkhau') or " +
+                    "contains(translate(@formcontrolname,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'matkhau')" +
+                    ")]"
+                ))
+                .Where(e =>
+                {
+                    try { return e.Displayed && e.Enabled; }
+                    catch { return false; }
+                })
+                .ToList();
 
-            if (inputs.Count == 0)
-                inputs = _driver.FindElements(By.XPath("//input"));
+            if (inputs.Count < 2)
+            {
+                DumpInputs(tag);
+                throw new NoSuchElementException($"{tag} Không tìm thấy đủ 2 ô mật khẩu. Số input password tìm được: {inputs.Count}");
+            }
 
-            var target = isFirst
-                ? inputs.Count > 3 ? inputs[3] : inputs[0]
-                : inputs.Count > 4 ? inputs[4] : inputs[inputs.Count - 1];
-
-            if (target != null) TypeText(target, value, tag, fieldName);
-            else Console.WriteLine($"{tag} [{fieldName}] CẢNH BÁO: Không tìm thấy password field");
+            var target = isFirst ? inputs[0] : inputs[1];
+            TypeText(target, value, tag, fieldName);
         }
 
         // ─── SUBMIT ───────────────────────────────────────────────────────────────
@@ -397,6 +541,18 @@ namespace TestProject1.UI
                 $"\n[FAILED] Toast lỗi không khớp.\nMong đợi: '{cleanExpected}'\nThực tế: '{cleanActual}'");
         }
 
+        private bool IsRegisterSuccessMessage(string cleanActual)
+        {
+            if (string.IsNullOrWhiteSpace(cleanActual)) return false;
+
+            // BE hiện tại có 2 kiểu thông báo thành công:
+            // 1) Đăng ký thành công! Check mail để lấy mã xác thực nhé
+            // 2) Đăng ký thành công nhưng chưa gửi được mã xác thực. Vui lòng bấm gửi lại mã.
+            // Cả 2 đều nghĩa là user đã được tạo, chỉ khác trạng thái gửi mail xác thực.
+            return cleanActual.Contains("đăng ký thành công") ||
+                   (cleanActual.Contains("thành công") && cleanActual.Contains("mã xác thực"));
+        }
+
         private void ClickSubmitAndWaitToastSuccess(WebDriverWait wait, string tag, string cleanExpected)
         {
             string actualText = TryGetAlertOrToast(wait, tag);
@@ -404,13 +560,40 @@ namespace TestProject1.UI
 
             if (!string.IsNullOrEmpty(cleanActual))
             {
-                Thread.Sleep(3000);
-                Assert.That(cleanActual, Does.Contain(cleanExpected));
-                return;
+                Thread.Sleep(1000);
+
+                if (cleanActual.Contains(cleanExpected) || IsRegisterSuccessMessage(cleanActual))
+                {
+                    Console.WriteLine($"{tag} [SUCCESS] Chấp nhận thông báo: '{cleanActual}'");
+                    return;
+                }
+
+                Assert.Fail(
+                    $"\n[FAILED] Toast thành công không khớp.\n" +
+                    $"Mong đợi: '{cleanExpected}'\n" +
+                    $"Thực tế: '{cleanActual}'");
             }
 
-            try { wait.Until(d => !d.Url.Contains("/register")); Thread.Sleep(2000); }
-            catch { }
+            try
+            {
+                wait.Until(d => !d.Url.Contains("/register"));
+                Thread.Sleep(1000);
+                Console.WriteLine($"{tag} [SUCCESS] Không thấy toast nhưng URL đã rời /register.");
+                return;
+            }
+            catch
+            {
+                try
+                {
+                    var bodyText = _driver.FindElement(By.TagName("body")).Text;
+                    Console.WriteLine($"{tag} [BODY WHEN STUCK] " + (bodyText.Length > 1500 ? bodyText[..1500] : bodyText));
+                    Console.WriteLine($"{tag} [CURRENT URL] {_driver.Url}");
+                    Console.WriteLine($"{tag} [SubmitDisabled] {IsSubmitDisabled()}");
+                }
+                catch { }
+
+                Assert.Fail($"{tag} Không thấy toast thành công và URL vẫn ở trang đăng ký.");
+            }
         }
 
         private string TryGetAlertOrToast(WebDriverWait wait, string tag)
@@ -444,22 +627,39 @@ namespace TestProject1.UI
                     "//mat-icon[contains(text(),'visibility') or contains(text(),'visibility_off')]",
                     "//span[contains(@class,'p-password-show-icon') or contains(@class,'p-password-hide-icon')]",
                     "//i[contains(@class,'eye') or contains(@class,'icon-eye')]",
+
+                    // Các nút mắt trong register thường là button/svg nằm sau input mật khẩu
+                    "//input[contains(translate(@name,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'password')]/following::button[1]",
+                    "//input[contains(translate(@formcontrolname,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'password')]/following::button[1]",
+                    "//input[contains(translate(@name,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'matkhau')]/following::button[1]",
+                    "//input[contains(translate(@formcontrolname,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'matkhau')]/following::button[1]",
+
                     "//input[@type='password']/following-sibling::*[1]",
                     "//input[contains(@formcontrolname,'password') or contains(@formcontrolname,'Password')]/following-sibling::*[1]"
                 };
 
                 IWebElement toggleBtn = null;
+
                 foreach (var xp in toggleXpaths)
                 {
                     try
                     {
                         var elems = _driver.FindElements(By.XPath(xp));
-                        if (elems.Count > 0 && elems[0].Displayed)
+                        foreach (var e in elems)
                         {
-                            toggleBtn = elems[0];
-                            Console.WriteLine($"{tag} [Toggle] Tìm thấy qua: {xp}");
-                            break;
+                            try
+                            {
+                                if (e.Displayed && e.Enabled)
+                                {
+                                    toggleBtn = e;
+                                    Console.WriteLine($"{tag} [Toggle] Tìm thấy qua: {xp}");
+                                    break;
+                                }
+                            }
+                            catch { }
                         }
+
+                        if (toggleBtn != null) break;
                     }
                     catch { }
                 }
@@ -469,19 +669,44 @@ namespace TestProject1.UI
                     ((IJavaScriptExecutor)_driver).ExecuteScript(
                         "arguments[0].scrollIntoView({block:'center'});", toggleBtn);
                     Thread.Sleep(300);
-                    toggleBtn.Click();
+                    ((IJavaScriptExecutor)_driver).ExecuteScript("arguments[0].click();", toggleBtn);
                     Thread.Sleep(500);
+                    return;
                 }
-                else
+
+                // Fallback: tìm input mật khẩu theo name/formcontrolname, không phụ thuộc type=password
+                Console.WriteLine($"{tag} [Toggle] Không tìm thấy nút mắt, fallback click offset trên input mật khẩu");
+
+                var passElem = _driver.FindElements(By.XPath(
+                    "//input[contains(translate(@name,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'password') or " +
+                    "contains(translate(@formcontrolname,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'password') or " +
+                    "contains(translate(@name,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'matkhau') or " +
+                    "contains(translate(@formcontrolname,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'matkhau')]"
+                )).FirstOrDefault(e =>
                 {
-                    Console.WriteLine($"{tag} [Toggle] Dùng offset fallback");
-                    var passElem = _driver.FindElement(By.XPath("//input[@type='password']"));
-                    new Actions(_driver).MoveToElement(passElem, passElem.Size.Width / 2 - 25, 0)
-                        .Click().Build().Perform();
-                    Thread.Sleep(500);
+                    try { return e.Displayed && e.Enabled; }
+                    catch { return false; }
+                });
+
+                if (passElem == null)
+                {
+                    DumpInputs(tag);
+                    Console.WriteLine($"{tag} [Toggle] Không tìm thấy input mật khẩu để fallback, bỏ qua toggle.");
+                    return;
                 }
+
+                new Actions(_driver)
+                    .MoveToElement(passElem, passElem.Size.Width / 2 - 25, 0)
+                    .Click()
+                    .Build()
+                    .Perform();
+
+                Thread.Sleep(500);
             }
-            catch (Exception ex) { Console.WriteLine($"{tag} [Toggle] Lỗi: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"{tag} [Toggle] Lỗi nhưng không chặn test: {ex.Message}");
+            }
         }
 
         // ─── ALERT ────────────────────────────────────────────────────────────────

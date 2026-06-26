@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Text.RegularExpressions;
+using System.Runtime.CompilerServices;
 
 namespace ICareAutomation.Tests
 {
@@ -58,10 +59,40 @@ namespace ICareAutomation.Tests
             }
         }
 
+        private static string ResolveExcelPath([CallerFilePath] string sourceFilePath = "")
+        {
+            // Khi chạy test, AppDomain.CurrentDomain.BaseDirectory thường là:
+            // bin/Debug/net9.0 nên nếu Excel không copy vào output thì sẽ bị FileNotFound.
+            var csDir = Path.GetDirectoryName(sourceFilePath) ?? "";
+            var projectRoot = Path.GetFullPath(Path.Combine(csDir, ".."));
+
+            var candidates = new[]
+            {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "LoginTestData.xlsx"),
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Excel", "LoginTestData.xlsx"),
+                Path.Combine(projectRoot, "Excel", "LoginTestData.xlsx"),
+                Path.Combine(csDir, "LoginTestData.xlsx")
+            };
+
+            foreach (var path in candidates)
+            {
+                if (File.Exists(path))
+                    return path;
+            }
+
+            throw new FileNotFoundException(
+                "Không tìm thấy LoginTestData.xlsx. Đã thử các đường dẫn: " +
+                string.Join(" | ", candidates),
+                candidates[0]
+            );
+        }
+
         public static IEnumerable<TestCaseData> ReadExcelData()
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "LoginTestData.xlsx");
+            string filePath = ResolveExcelPath();
+
+            Console.WriteLine("[LOGIN-EXCEL] Đang đọc file: " + filePath);
 
             using (var stream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             using (var reader = ExcelReaderFactory.CreateReader(stream))

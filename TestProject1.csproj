@@ -42,7 +42,7 @@
 
 	<ItemGroup>
 		<None Update="Excel\CreateAuctionTestData.xlsx">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
 		<None Update="Excel\RegisterTestData.xlsx">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
