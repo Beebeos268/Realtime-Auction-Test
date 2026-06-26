@@ -1,6 +1,56 @@
+# Visual Studio / .NET
 .vs/
 bin/
 obj/
-TestProject1.csproj.Backup.tmp
+[Bb]in/
+[Oo]bj/
+
+# User-specific files
 *.user
 *.suo
+*.rsuser
+*.userosscache
+*.sln.docstates
+
+# Temporary / backup files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.Backup.tmp
+*.csproj.Backup.tmp
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+coverage-reports/
+
+# Logs / screenshots from Selenium
+*.log
+*_fail.png
+login_fail.png
+screenshots/
+Screenshots/
+
+# Chrome / Selenium temp data
+ChromeProfile/
+Selenium_*/
+chromedriver.log
+
+# VS Code optional
+.vscode/
+
+# Excel temporary lock files
+~$*.xlsx
+~$*.xls
+
+# Secrets / tokens
+*.token
+*_token.txt
+seller_token.txt
+appsettings.Development.json
+.env
+.env.*
